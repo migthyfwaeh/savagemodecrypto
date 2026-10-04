@@ -24,17 +24,11 @@ const chartName = document.getElementById("chartName");
 const chartTicker = document.getElementById("chartTicker");
 const chartContainer = document.getElementById("chartContainer");
 
-// ★ ДОБАВЛЕНО: цена REDO в долларах
-const featuredUsd = document.getElementById("featuredUsd");
-
 // ---------- Состояние ----------
 const cards = {};
 const prevPrices = {};
 const history = {};
 const lastPrices = {};
-
-// ★ ДОБАВЛЕНО: REDO = 777 GRAM (пересчитывается в USD по текущей цене GRAM)
-const REDO_GRAM_AMOUNT = 777;
 
 // ---------- Портфель из localStorage ----------
 let portfolio = JSON.parse(localStorage.getItem("portfolio") || "{}");
@@ -155,15 +149,6 @@ function updateCard(symbol, data) {
     history[symbol].push(price);
     if (history[symbol].length > 30) history[symbol].shift();
     drawSparkline(refs.spark, history[symbol], change >= 0);
-
-    // ★ Пересчёт REDO в долларах по текущей цене GRAM
-    if (symbol === "gramusdt" && featuredUsd) {
-        const redoUsd = REDO_GRAM_AMOUNT * price;
-        featuredUsd.textContent = "≈ $" + redoUsd.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-    }
 
     renderPortfolioValues();
 }
