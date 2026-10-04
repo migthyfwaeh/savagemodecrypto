@@ -706,3 +706,83 @@ body.light .card:hover { border-color: #cbd5e1; }
     .portfolio-item .portfolio-input { grid-area: input; }
     .portfolio-item .portfolio-value { grid-area: value; }
 }
+
+/* ---------- Строка с кнопкой «Все токены» ---------- */
+.all-tokens-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+}
+
+.btn-all {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 999px;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+}
+
+.btn-all:hover {
+    background: var(--card-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-all:active {
+    transform: scale(0.97);
+}
+
+/* ---------- Кнопка «+ Добавить токен» под карточками ---------- */
+.add-token-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.btn-add-token {
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-add-token:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--card-hover);
+    border-style: solid;
+}
+
+.btn-add-token:active {
+    transform: scale(0.97);
+}
+
+/* ---------- Заголовок «Избранное» + кнопка «Все токены» ---------- */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+}
+
+.section-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    margin: 0;
+}

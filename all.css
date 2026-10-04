@@ -1,0 +1,120 @@
+/* ---------- Стили только для all.html ---------- */
+
+/* Навигация сверху */
+.all-nav-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-all {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-all:hover {
+    background: var(--card-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-all:active {
+    transform: scale(0.97);
+}
+
+/* Подсказка */
+.hint-row {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.hint-text {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+/* ★ Растянутая сетка — 2 колонки вместо 4 */
+.grid-large {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+/* Растянутые карточки */
+.grid-large .card {
+    padding: 24px;
+}
+
+.grid-large .coin-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+}
+
+.grid-large .coin-icon img {
+    width: 32px;
+    height: 32px;
+}
+
+.grid-large .coin-name {
+    font-size: 17px;
+}
+
+.grid-large .coin-symbol {
+    font-size: 13px;
+}
+
+.grid-large .price {
+    font-size: 36px;
+    margin-bottom: 22px;
+}
+
+.grid-large .change-badge {
+    font-size: 13px;
+    padding: 5px 12px;
+}
+
+.grid-large .stats {
+    padding-top: 18px;
+    margin-bottom: 18px;
+}
+
+.grid-large .stat-label {
+    font-size: 11px;
+}
+
+.grid-large .stat-value {
+    font-size: 14px;
+}
+
+.grid-large .sparkline {
+    height: 45px;
+}
+
+/* Мобильные — 1 колонка */
+@media (max-width: 700px) {
+    .grid-large {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-large .price {
+        font-size: 28px;
+    }
+}

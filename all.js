@@ -1,9 +1,9 @@
-// ---------- Дефолтные монеты ----------
+// ---------- Дефолтные монеты (на случай, если watchlist пустой) ----------
 const DEFAULT_COINS = [
-    { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "Bitcoin.svg" },
-    { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "solana.svg" },
-    { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zcash.svg" },
-    { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", location: "gram.png" },
+    { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "btc.svg" },
+    { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "sol.svg" },
+    { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zec.svg" },
+    { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", localIcon: "gram.svg" },
 ];
 
 // ---------- Известные монеты ----------
@@ -61,18 +61,12 @@ function saveWatchlist() {
     localStorage.setItem("watchlist", JSON.stringify(watchlist));
 }
 
-// ★ На главной показываем только первые 4
-function getHomeCoins() {
-    return watchlist.slice(0, 4);
-}
-
 // ---------- DOM ----------
 const grid = document.getElementById("grid");
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const lastUpdate = document.getElementById("lastUpdate");
 const template = document.getElementById("cardTemplate");
-const emptyTemplate = document.getElementById("emptyCardTemplate");
 const themeBtn = document.getElementById("themeBtn");
 const portfolioBtn = document.getElementById("portfolioBtn");
 const portfolioModal = document.getElementById("portfolioModal");
@@ -89,6 +83,8 @@ const addClose = document.getElementById("addClose");
 const tickerInput = document.getElementById("tickerInput");
 const addHint = document.getElementById("addHint");
 const addConfirm = document.getElementById("addConfirm");
+const addBtn = document.getElementById("addBtn");
+const hintRow = document.getElementById("hintRow");
 
 // ---------- Состояние ----------
 const cards = {};
@@ -167,30 +163,23 @@ function createCard(coin) {
     return node;
 }
 
-function createEmptyCard() {
-    const node = emptyTemplate.content.cloneNode(true);
-    const card = node.querySelector(".card-empty");
-    card.addEventListener("click", openAddModal);
-    return node;
-}
-
 function renderWatchlist() {
     grid.innerHTML = "";
     Object.keys(cards).forEach((k) => delete cards[k]);
 
-    const homeCoins = getHomeCoins();
-
-    homeCoins.forEach((coin) => {
-        grid.appendChild(createCard(coin));
-    });
-
-    // Добиваем пустыми слотами до 4
-    const emptyCount = Math.max(0, 4 - homeCoins.length);
-    for (let i = 0; i < emptyCount; i++) {
-        grid.appendChild(createEmptyCard());
+    if (!watchlist.length) {
+        grid.innerHTML = `<p style="color:var(--text-muted);grid-column:1/-1;text-align:center;padding:40px 0;">Список пуст. Добавь токены.</p>`;
+    } else {
+        watchlist.forEach((coin) => grid.appendChild(createCard(coin)));
     }
 
-    // Подключаем WebSocket только к тем монетам, что на главной (4 избранных)
+    // Показываем подсказку, если монет меньше 4
+    if (watchlist.length < 4) {
+        hintRow.style.display = "block";
+    } else {
+        hintRow.style.display = "none";
+    }
+
     reconnectWebSocket();
     renderPortfolioValues();
 }
@@ -262,6 +251,7 @@ function setHint(text, cls) {
     addHint.className = "add-hint" + (cls ? " " + cls : "");
 }
 
+addBtn.addEventListener("click", openAddModal);
 addClose.addEventListener("click", closeAddModal);
 addModal.addEventListener("click", (e) => { if (e.target === addModal) closeAddModal(); });
 addConfirm.addEventListener("click", addCoin);
@@ -525,9 +515,8 @@ function reconnectWebSocket() {
 }
 
 function connect() {
-    const homeCoins = getHomeCoins();
-    if (!homeCoins.length) return;
-    const streams = homeCoins.map((c) => `${c.symbol}@ticker`).join("/");
+    if (!watchlist.length) return;
+    const streams = watchlist.map((c) => `${c.symbol}@ticker`).join("/");
     ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
 
     ws.onopen = () => {
@@ -562,13 +551,6 @@ function connect() {
 // ============================================================
 //  🚀 ЗАПУСК
 // ============================================================
-
-// ★ Кнопка «+ Добавить токен» под карточками
-const addBtnBottom = document.getElementById("addBtnBottom");
-if (addBtnBottom) {
-    addBtnBottom.addEventListener("click", openAddModal);
-}
-
 initTheme();
 renderWatchlist();
 loadBinanceSymbols();
