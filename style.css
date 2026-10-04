@@ -223,13 +223,25 @@ body.light .card:hover { border-color: #cbd5e1; }
     overflow: hidden;
 }
 
-.coin-icon i { font-size: 24px; line-height: 1; }
-
 .coin-icon img {
     width: 26px;
     height: 26px;
     object-fit: contain;
     display: block;
+    border-radius: 6px;
+}
+
+/* ★ Fallback — буквенный бейдж, если нет иконки */
+.icon-fallback {
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
     border-radius: 6px;
 }
 
@@ -453,8 +465,6 @@ body.light .card:hover { border-color: #cbd5e1; }
     height: 36px;
 }
 
-.portfolio-item .coin-icon i { font-size: 20px; }
-
 .portfolio-item .coin-icon img {
     width: 22px;
     height: 22px;
@@ -519,6 +529,166 @@ body.light .card:hover { border-color: #cbd5e1; }
     margin-top: 4px;
 }
 
+/* ---------- Крестик удаления на карточке ---------- */
+.card-remove {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--modal-bg);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.15s, transform 0.15s, background 0.15s, color 0.15s;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+    padding: 0;
+}
+
+.card:hover .card-remove {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.card-remove:hover {
+    background: var(--red);
+    border-color: var(--red);
+    color: white;
+}
+
+/* ---------- Пустая карточка ---------- */
+.card-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    border: 2px dashed var(--border);
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.card-empty:hover {
+    border-color: var(--accent);
+    background: var(--card-hover);
+    transform: none;
+}
+
+.card-add {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-muted);
+    font-size: 28px;
+    font-weight: 300;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+    padding: 0;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+}
+
+.card-empty:hover .card-add {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    transform: scale(1.08);
+}
+
+.card-empty-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ---------- Модалка добавления ---------- */
+.modal-small {
+    max-width: 420px;
+}
+
+.add-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.add-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.add-input {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 16px;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.add-input:focus {
+    border-color: var(--accent);
+}
+
+.add-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-height: 16px;
+    line-height: 1.4;
+}
+
+.add-hint.error {
+    color: var(--red);
+}
+
+.add-hint.success {
+    color: var(--green);
+}
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.btn-primary:hover {
+    background: #5558e8;
+    border-color: #5558e8;
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ---------- Мобильная адаптация ---------- */
 @media (max-width: 600px) {
     body { padding: 16px; }
     .price { font-size: 24px; }

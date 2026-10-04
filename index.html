@@ -5,12 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crypto Watch — реальное время</title>
 
-    <!-- Шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-
-    <!-- Иконки криптовалют -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simple-icons-font@v16/font/simple-icons.min.css" type="text/css" />
 
     <link rel="stylesheet" href="style.css" />
@@ -19,7 +16,9 @@
     <div class="app">
         <header class="header">
             <div class="brand">
-                <div class="logo"><img src="77.png" alt="Logo" /></div>
+                <div class="logo">
+                    <img src="77.png" alt="Logo" />
+                </div>
                 <div>
                     <h1>SSSAVAGEMODEE</h1>
                     <p class="subtitle">Цены в реальном времени</p>
@@ -27,12 +26,8 @@
             </div>
 
             <div class="header-actions">
-                <button id="portfolioBtn" class="btn" title="Портфель">
-                    💼 Портфель
-                </button>
-                <button id="themeBtn" class="btn btn-icon" title="Сменить тему">
-                    🌙
-                </button>
+                <button id="portfolioBtn" class="btn" title="Портфель">💼 Портфель</button>
+                <button id="themeBtn" class="btn btn-icon" title="Сменить тему">🌙</button>
                 <div class="status">
                     <span class="dot" id="statusDot"></span>
                     <span id="statusText">Подключение…</span>
@@ -46,6 +41,31 @@
             <span>Источник: Binance WebSocket</span>
             <span id="lastUpdate">—</span>
         </footer>
+    </div>
+
+    <!-- ★ Модальное окно добавления токена -->
+    <div class="modal" id="addModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span>Добавить токен</span>
+                </div>
+                <button class="modal-close" id="addClose">✕</button>
+            </div>
+            <div class="add-body">
+                <label class="add-label" for="tickerInput">Тикер монеты</label>
+                <input
+                    id="tickerInput"
+                    class="add-input"
+                    type="text"
+                    placeholder="Например: ETH"
+                    autocomplete="off"
+                    spellcheck="false"
+                />
+                <p class="add-hint" id="addHint">Введи тикер — проверим, есть ли пара на Binance.</p>
+                <button class="btn btn-primary" id="addConfirm">Добавить</button>
+            </div>
+        </div>
     </div>
 
     <!-- ★ Модальное окно с графиком -->
@@ -96,6 +116,7 @@
 
     <template id="cardTemplate">
         <div class="card">
+            <button class="card-remove" title="Удалить">✕</button>
             <div class="card-head">
                 <div class="coin">
                     <div class="coin-icon"></div>
@@ -132,7 +153,14 @@
         </div>
     </template>
 
-    <!-- ★ TradingView Lightweight Charts -->
+    <!-- ★ Шаблон пустого слота -->
+    <template id="emptyCardTemplate">
+        <div class="card card-empty">
+            <button class="card-add" title="Добавить токен">+</button>
+            <div class="card-empty-text">Добавить токен</div>
+        </div>
+    </template>
+
     <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
     <script src="app.js"></script>
 </body>

@@ -1,10 +1,88 @@
-// ---------- Конфигурация монет ----------
-const COINS = [
-    { symbol: "btcusdt", name: "Bitcoin",  ticker: "BTC",  icon: "bitcoin" },
-    { symbol: "solusdt", name: "Solana",   ticker: "SOL",  icon: "solana" },
-    { symbol: "zecusdt", name: "Zcash",    ticker: "ZEC",  icon: "zcash" },
-    { symbol: "gramusdt", name: "Gram", ticker: "GRAM", customIcon: "gram.png" },
+// ---------- Дефолтные монеты ----------
+const DEFAULT_COINS = [
+    { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "Bitcoin.svg" },
+    { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "solana.svg" },
+    { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zcash.svg" },
+    { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", location: "gram.png" },
 ];
+
+// ---------- Известные монеты ----------
+const KNOWN_COINS = {
+    btc:   { name: "Bitcoin",     ticker: "BTC",  localIcon: "Bitcoin.svg" },
+    sol:   { name: "Solana",      ticker: "SOL",  localIcon: "solana.svg" },
+    zec:   { name: "Zcash",       ticker: "ZEC",  localIcon: "zcash.svg" },
+    gram:  { name: "Gram",        ticker: "GRAM", localIcon: "gram.svg" },
+    eth:   { name: "Ethereum",    ticker: "ETH",  localIcon: "ethereum.svg" },
+    bnb:   { name: "BNB",         ticker: "BNB",  localIcon: "binance.svg" },
+    xrp:   { name: "XRP",         ticker: "XRP",  localIcon: "xrp.svg" },
+    hype:  { name: "Hyperliquid", ticker: "HYPE", localIcon: "hype.svg" },
+};
+
+// ---------- ★ Кэш всех пар Binance ----------
+const BINANCE_SYMBOLS_KEY = "binanceSymbols";
+const BINANCE_SYMBOLS_TTL = 24 * 60 * 60 * 1000; // 24 часа
+
+let binanceSymbols = null; // Set тикеров вида "BTCUSDT"
+
+async function loadBinanceSymbols(force = false) {
+    // 1. Проверяем localStorage
+    if (!force) {
+        try {
+            const cached = JSON.parse(localStorage.getItem(BINANCE_SYMBOLS_KEY));
+            if (cached && cached.time && (Date.now() - cached.time < BINANCE_SYMBOLS_TTL)) {
+                binanceSymbols = new Set(cached.symbols);
+                console.log(`[Binance] Загружено ${binanceSymbols.size} пар из кэша`);
+                return;
+            }
+        } catch (e) {}
+    }
+
+    // 2. Грузим с Binance
+    try {
+        console.log("[Binance] Загружаем exchangeInfo…");
+        const res = await fetch("https://api.binance.com/api/v3/exchangeInfo");
+        const data = await res.json();
+
+        if (!data.symbols) throw new Error("Нет данных symbols");
+
+        // Оставляем только активные пары с USDT
+        const list = data.symbols
+            .filter(s => s.status === "TRADING" && s.quoteAsset === "USDT")
+            .map(s => s.symbol); // "BTCUSDT", "ETHUSDT", …
+
+        binanceSymbols = new Set(list);
+        localStorage.setItem(BINANCE_SYMBOLS_KEY, JSON.stringify({
+            time: Date.now(),
+            symbols: list,
+        }));
+        console.log(`[Binance] Загружено ${list.length} пар`);
+    } catch (e) {
+        console.warn("[Binance] Не удалось загрузить exchangeInfo:", e);
+        // Пробуем старый кэш, даже просроченный
+        try {
+            const cached = JSON.parse(localStorage.getItem(BINANCE_SYMBOLS_KEY));
+            if (cached && cached.symbols) {
+                binanceSymbols = new Set(cached.symbols);
+                console.log(`[Binance] Используем просроченный кэш (${binanceSymbols.size} пар)`);
+            }
+        } catch (e2) {}
+    }
+}
+
+// ---------- Watchlist ----------
+let watchlist = loadWatchlist();
+
+function loadWatchlist() {
+    try {
+        const saved = JSON.parse(localStorage.getItem("watchlist"));
+        if (Array.isArray(saved) && saved.length) return saved;
+    } catch (e) {}
+    return [...DEFAULT_COINS];
+}
+
+function saveWatchlist() {
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+}
 
 // ---------- DOM ----------
 const grid = document.getElementById("grid");
@@ -12,6 +90,7 @@ const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const lastUpdate = document.getElementById("lastUpdate");
 const template = document.getElementById("cardTemplate");
+const emptyTemplate = document.getElementById("emptyCardTemplate");
 const themeBtn = document.getElementById("themeBtn");
 const portfolioBtn = document.getElementById("portfolioBtn");
 const portfolioModal = document.getElementById("portfolioModal");
@@ -23,17 +102,19 @@ const chartClose = document.getElementById("chartClose");
 const chartName = document.getElementById("chartName");
 const chartTicker = document.getElementById("chartTicker");
 const chartContainer = document.getElementById("chartContainer");
+const addModal = document.getElementById("addModal");
+const addClose = document.getElementById("addClose");
+const tickerInput = document.getElementById("tickerInput");
+const addHint = document.getElementById("addHint");
+const addConfirm = document.getElementById("addConfirm");
 
 // ---------- Состояние ----------
 const cards = {};
 const prevPrices = {};
 const history = {};
 const lastPrices = {};
-
-// ---------- Портфель из localStorage ----------
 let portfolio = JSON.parse(localStorage.getItem("portfolio") || "{}");
 
-// ---------- ★ Дальняя граница графика: с начала лета 2026 ----------
 const START_DATE = new Date("2026-06-01T00:00:00Z");
 
 // ============================================================
@@ -52,7 +133,6 @@ function applyTheme(theme) {
 function initTheme() {
     const saved = localStorage.getItem("theme") || "dark";
     applyTheme(saved);
-
     themeBtn.addEventListener("click", () => {
         const next = document.body.classList.contains("light") ? "dark" : "light";
         localStorage.setItem("theme", next);
@@ -66,39 +146,173 @@ function initTheme() {
 // ============================================================
 //  🃏 КАРТОЧКИ
 // ============================================================
-function buildCards() {
-    COINS.forEach((coin) => {
-        const node = template.content.cloneNode(true);
-        const card = node.querySelector(".card");
-
-        const icon = card.querySelector(".coin-icon");
-        if (coin.customIcon) {
-            icon.innerHTML = `<img src="${coin.customIcon}" alt="${coin.name}">`;
-        } else {
-            icon.innerHTML = `<i class="si si-${coin.icon} si--color"></i>`;
-        }
-
-        card.querySelector(".coin-name").textContent = coin.name;
-        card.querySelector(".coin-symbol").textContent = coin.ticker + " / USDT";
-
-        card.addEventListener("click", () => openChart(coin));
-
-        cards[coin.symbol] = {
-            card,
-            price: card.querySelector(".price"),
-            change: card.querySelector(".change-badge"),
-            high: card.querySelector(".high"),
-            low: card.querySelector(".low"),
-            volume: card.querySelector(".volume"),
-            spark: card.querySelector(".spark-line"),
-        };
-
-        history[coin.symbol] = [];
-        grid.appendChild(node);
-    });
+function getIconHTML(coin) {
+    if (coin.customIcon) {
+        return `<img src="${coin.customIcon}" alt="${coin.name}">`;
+    }
+    if (coin.localIcon) {
+        return `<img src="${coin.localIcon}" alt="${coin.name}">`;
+    }
+    const letters = coin.ticker.slice(0, 3);
+    return `<span class="icon-fallback">${letters}</span>`;
 }
 
-// ---------- Форматирование ----------
+function createCard(coin) {
+    const node = template.content.cloneNode(true);
+    const card = node.querySelector(".card");
+
+    const icon = card.querySelector(".coin-icon");
+    icon.innerHTML = getIconHTML(coin);
+
+    card.querySelector(".coin-name").textContent = coin.name;
+    card.querySelector(".coin-symbol").textContent = coin.ticker + " / USDT";
+
+    card.addEventListener("click", (e) => {
+        if (e.target.closest(".card-remove")) return;
+        openChart(coin);
+    });
+
+    const removeBtn = card.querySelector(".card-remove");
+    removeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeCoin(coin.symbol);
+    });
+
+    cards[coin.symbol] = {
+        card,
+        price: card.querySelector(".price"),
+        change: card.querySelector(".change-badge"),
+        high: card.querySelector(".high"),
+        low: card.querySelector(".low"),
+        volume: card.querySelector(".volume"),
+        spark: card.querySelector(".spark-line"),
+    };
+
+    history[coin.symbol] = history[coin.symbol] || [];
+    return node;
+}
+
+function createEmptyCard() {
+    const node = emptyTemplate.content.cloneNode(true);
+    const card = node.querySelector(".card-empty");
+    card.addEventListener("click", openAddModal);
+    return node;
+}
+
+function renderWatchlist() {
+    grid.innerHTML = "";
+    Object.keys(cards).forEach((k) => delete cards[k]);
+
+    watchlist.forEach((coin) => {
+        grid.appendChild(createCard(coin));
+    });
+
+    const emptyCount = Math.max(0, 4 - watchlist.length);
+    for (let i = 0; i < emptyCount; i++) {
+        grid.appendChild(createEmptyCard());
+    }
+
+    reconnectWebSocket();
+    renderPortfolioValues();
+}
+
+function removeCoin(symbol) {
+    if (watchlist.length <= 1) return;
+    watchlist = watchlist.filter((c) => c.symbol !== symbol);
+    saveWatchlist();
+    renderWatchlist();
+}
+
+// ============================================================
+//  ➕ ДОБАВЛЕНИЕ ТОКЕНА (без запросов к Binance!)
+// ============================================================
+function openAddModal() {
+    addModal.classList.add("open");
+    document.body.style.overflow = "hidden";
+    tickerInput.value = "";
+    addHint.textContent = "Введи тикер — проверим по списку Binance.";
+    addHint.className = "add-hint";
+    setTimeout(() => tickerInput.focus(), 100);
+}
+
+function closeAddModal() {
+    addModal.classList.remove("open");
+    document.body.style.overflow = "";
+}
+
+function addCoin() {
+    const raw = tickerInput.value.trim().toUpperCase();
+    if (!raw) {
+        setHint("Введи тикер", "error");
+        return;
+    }
+
+    const symbol = raw + "USDT";
+
+    // 1. Уже в избранном?
+    if (watchlist.some((c) => c.symbol === raw.toLowerCase() + "usdt")) {
+        setHint("Эта монета уже в избранном", "error");
+        return;
+    }
+
+    // 2. Есть ли пара на Binance?
+    if (!binanceSymbols) {
+        setHint("Список Binance ещё не загружен. Подожди пару секунд и попробуй снова.", "error");
+        return;
+    }
+
+    if (!binanceSymbols.has(symbol)) {
+        setHint(`Пары ${symbol} нет на Binance`, "error");
+        return;
+    }
+
+    // 3. Формируем объект монеты
+    const known = KNOWN_COINS[raw.toLowerCase()];
+    let coin;
+    if (known) {
+        coin = {
+            symbol: raw.toLowerCase() + "usdt",
+            name: known.name,
+            ticker: known.ticker,
+            localIcon: known.localIcon,
+        };
+    } else {
+        coin = {
+            symbol: raw.toLowerCase() + "usdt",
+            name: raw,
+            ticker: raw,
+            localIcon: null,
+        };
+    }
+
+    watchlist.push(coin);
+    saveWatchlist();
+
+    setHint(`Добавлено: ${coin.name}`, "success");
+
+    setTimeout(() => {
+        closeAddModal();
+        renderWatchlist();
+    }, 500);
+}
+
+function setHint(text, cls) {
+    addHint.textContent = text;
+    addHint.className = "add-hint" + (cls ? " " + cls : "");
+}
+
+addClose.addEventListener("click", closeAddModal);
+addModal.addEventListener("click", (e) => {
+    if (e.target === addModal) closeAddModal();
+});
+addConfirm.addEventListener("click", addCoin);
+tickerInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addCoin();
+});
+
+// ============================================================
+//  📊 ФОРМАТИРОВАНИЕ
+// ============================================================
 function formatPrice(value) {
     if (value >= 1000) return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 2 });
     if (value >= 1) return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -112,7 +326,6 @@ function formatVolume(value) {
     return value.toFixed(2);
 }
 
-// ---------- Обновление карточки ----------
 function updateCard(symbol, data) {
     const refs = cards[symbol];
     if (!refs) return;
@@ -124,7 +337,6 @@ function updateCard(symbol, data) {
     const volume = parseFloat(data.q);
 
     lastPrices[symbol] = price;
-
     refs.price.textContent = formatPrice(price);
 
     const prev = prevPrices[symbol];
@@ -153,7 +365,6 @@ function updateCard(symbol, data) {
     renderPortfolioValues();
 }
 
-// ---------- Спарклайн ----------
 function drawSparkline(polyline, values, isUp) {
     if (values.length < 2) return;
     const min = Math.min(...values);
@@ -171,7 +382,7 @@ function drawSparkline(polyline, values, isUp) {
 }
 
 // ============================================================
-//  📊 ГРАФИК (TradingView Lightweight Charts)
+//  📊 ГРАФИК (напрямую к Binance — работает без CORS)
 // ============================================================
 let chartInstance = null;
 let candleSeries = null;
@@ -254,11 +465,9 @@ async function renderChart(symbol, interval) {
             }));
 
             allCandles = allCandles.concat(parsed);
-
             const lastTime = parsed[parsed.length - 1].time;
             if (lastTime <= cursor) break;
             cursor = lastTime + 1;
-
             if (allCandles.length > 20000) break;
         }
 
@@ -294,14 +503,11 @@ chartModal.addEventListener("click", (e) => {
 function buildPortfolio() {
     portfolioList.innerHTML = "";
 
-    COINS.forEach((coin) => {
+    watchlist.forEach((coin) => {
         const item = document.createElement("div");
         item.className = "portfolio-item";
 
-        const iconHTML = coin.customIcon
-            ? `<img src="${coin.customIcon}" alt="${coin.name}">`
-            : `<i class="si si-${coin.icon} si--color"></i>`;
-
+        const iconHTML = getIconHTML(coin);
         const value = portfolio[coin.symbol] || "";
 
         item.innerHTML = `
@@ -310,15 +516,8 @@ function buildPortfolio() {
                 <div class="portfolio-name">${coin.name}</div>
                 <div class="portfolio-ticker">${coin.ticker}</div>
             </div>
-            <input
-                class="portfolio-input"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="0"
-                data-symbol="${coin.symbol}"
-                value="${value}"
-            />
+            <input class="portfolio-input" type="number" min="0" step="any"
+                placeholder="0" data-symbol="${coin.symbol}" value="${value}" />
             <div class="portfolio-value" data-symbol="${coin.symbol}">$0.00</div>
         `;
 
@@ -339,8 +538,7 @@ function buildPortfolio() {
 
 function renderPortfolioValues() {
     let total = 0;
-
-    COINS.forEach((coin) => {
+    watchlist.forEach((coin) => {
         const amount = portfolio[coin.symbol] || 0;
         const price = lastPrices[coin.symbol] || 0;
         const value = amount * price;
@@ -353,10 +551,8 @@ function renderPortfolioValues() {
             });
             el.style.color = amount > 0 ? "var(--text)" : "var(--text-muted)";
         }
-
         total += value;
     });
-
     portfolioTotal.textContent = "$" + total.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -384,6 +580,7 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
         if (chartModal.classList.contains("open")) closeChart();
         if (portfolioModal.classList.contains("open")) closePortfolio();
+        if (addModal.classList.contains("open")) closeAddModal();
     }
 });
 
@@ -393,8 +590,17 @@ document.addEventListener("keydown", (e) => {
 let ws = null;
 let reconnectTimer = null;
 
+function reconnectWebSocket() {
+    if (ws) {
+        try { ws.close(); } catch (e) {}
+        ws = null;
+    }
+    connect();
+}
+
 function connect() {
-    const streams = COINS.map((c) => `${c.symbol}@ticker`).join("/");
+    if (!watchlist.length) return;
+    const streams = watchlist.map((c) => `${c.symbol}@ticker`).join("/");
     ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
 
     ws.onopen = () => {
@@ -430,5 +636,5 @@ function connect() {
 //  🚀 ЗАПУСК
 // ============================================================
 initTheme();
-buildCards();
-connect();
+renderWatchlist();
+loadBinanceSymbols(); // ← загружаем список пар в фоне
