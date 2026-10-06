@@ -118,3 +118,17 @@
         font-size: 28px;
     }
 }
+
+/* Крупный бейдж рейтинга для растянутых карточек */
+.grid-large .rating-badge {
+    font-size: 13px;
+    padding: 8px 16px;
+}
+
+.grid-large .rating-icon {
+    font-size: 16px;
+}
+
+.grid-large .rating-text {
+    font-size: 13px;
+}

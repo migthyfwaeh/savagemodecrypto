@@ -3,7 +3,7 @@ const DEFAULT_COINS = [
     { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "Bitcoin.svg" },
     { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "solana.svg" },
     { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zcash.svg" },
-    { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", location: "gram.png" },
+    { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", localIcon: "gram.svg" },
 ];
 
 // ---------- Известные монеты ----------
@@ -61,7 +61,6 @@ function saveWatchlist() {
     localStorage.setItem("watchlist", JSON.stringify(watchlist));
 }
 
-// ★ На главной показываем только первые 4
 function getHomeCoins() {
     return watchlist.slice(0, 4);
 }
@@ -126,6 +125,125 @@ function initTheme() {
 }
 
 // ============================================================
+//  📊 РЕКОМЕНДАТЕЛЬНАЯ СИСТЕМА
+// ============================================================
+let ratingsCache = JSON.parse(localStorage.getItem("ratingsCache") || "{}");
+const RATING_TTL = 60 * 60 * 1000;
+
+function calcRSI(closes, period = 14) {
+    if (closes.length < period + 1) return null;
+
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+        const diff = closes[i] - closes[i - 1];
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    for (let i = period + 1; i < closes.length; i++) {
+        const diff = closes[i] - closes[i - 1];
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+    }
+
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+function calcMA(closes, period) {
+    if (closes.length < period) return null;
+    const slice = closes.slice(-period);
+    const sum = slice.reduce((a, b) => a + b, 0);
+    return sum / period;
+}
+
+async function calcRating(symbol) {
+    const cached = ratingsCache[symbol];
+    if (cached && (Date.now() - cached.timestamp < RATING_TTL)) {
+        return cached;
+    }
+
+    try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1d&limit=250`;
+        const res = await fetch(url);
+        const raw = await res.json();
+
+        if (!Array.isArray(raw) || raw.length < 50) {
+            const result = { rating: "neutral", level: 0, reason: "Недостаточно данных", timestamp: Date.now() };
+            ratingsCache[symbol] = result;
+            localStorage.setItem("ratingsCache", JSON.stringify(ratingsCache));
+            return result;
+        }
+
+        const closes = raw.map(k => parseFloat(k[4]));
+        const currentPrice = closes[closes.length - 1];
+
+        const rsi = calcRSI(closes, 14);
+        const ma50 = calcMA(closes, 50);
+        const ma200 = calcMA(closes, 200);
+
+        let score = 0;
+        const signals = [];
+
+        if (rsi !== null) {
+            if (rsi < 30) { score += 1; signals.push(`RSI ${rsi.toFixed(1)} → перепродан`); }
+            else if (rsi > 70) { score -= 1; signals.push(`RSI ${rsi.toFixed(1)} → перекуплен`); }
+            else signals.push(`RSI ${rsi.toFixed(1)} → нейтрально`);
+        }
+
+        if (ma50 !== null) {
+            if (currentPrice > ma50) { score += 1; signals.push(`Цена > MA50`); }
+            else { score -= 1; signals.push(`Цена < MA50`); }
+        }
+
+        if (ma200 !== null) {
+            if (currentPrice > ma200) { score += 1; signals.push(`Цена > MA200`); }
+            else { score -= 1; signals.push(`Цена < MA200`); }
+        }
+
+        let rating, level;
+        if (score >= 3) { rating = "strong_buy"; level = 2; }
+        else if (score >= 1) { rating = "buy"; level = 1; }
+        else if (score <= -3) { rating = "strong_sell"; level = -2; }
+        else if (score <= -1) { rating = "sell"; level = -1; }
+        else { rating = "neutral"; level = 0; }
+
+        const result = { rating, level, score, signals, rsi, ma50, ma200, currentPrice, timestamp: Date.now() };
+        ratingsCache[symbol] = result;
+        localStorage.setItem("ratingsCache", JSON.stringify(ratingsCache));
+        return result;
+    } catch (e) {
+        console.warn(`Не удалось посчитать рейтинг для ${symbol}:`, e);
+        return { rating: "neutral", level: 0, reason: "Ошибка загрузки", timestamp: Date.now() };
+    }
+}
+
+// ★ Отрисовка бейджа рейтинга (текстовый формат)
+function renderRatingBadge(container, ratingData) {
+    if (!container) return;
+    const { rating } = ratingData;
+
+    let text, cls;
+    if (rating === "strong_buy") { text = "Активно покупать"; cls = "rating-strong-buy"; }
+    else if (rating === "buy") { text = "Покупать"; cls = "rating-buy"; }
+    else if (rating === "strong_sell") { text = "Активно продавать"; cls = "rating-strong-sell"; }
+    else if (rating === "sell") { text = "Продавать"; cls = "rating-sell"; }
+    else { text = "Нейтрально"; cls = "rating-neutral"; }
+
+    container.innerHTML = `
+        <span class="rating-label">Тех. анализ:</span>
+        <span class="rating-text">${text}</span>
+    `;
+    container.className = "rating-badge " + cls;
+}
+
+// ============================================================
 //  🃏 КАРТОЧКИ
 // ============================================================
 function getIconHTML(coin) {
@@ -164,6 +282,16 @@ function createCard(coin) {
     };
 
     history[coin.symbol] = history[coin.symbol] || [];
+
+    // ★ Расчёт рейтинга для карточки
+    const ratingEl = card.querySelector(".rating-badge");
+    if (ratingEl) {
+        ratingEl.dataset.symbol = coin.symbol;
+        calcRating(coin.symbol).then((data) => {
+            renderRatingBadge(ratingEl, data);
+        });
+    }
+
     return node;
 }
 
@@ -184,13 +312,11 @@ function renderWatchlist() {
         grid.appendChild(createCard(coin));
     });
 
-    // Добиваем пустыми слотами до 4
     const emptyCount = Math.max(0, 4 - homeCoins.length);
     for (let i = 0; i < emptyCount; i++) {
         grid.appendChild(createEmptyCard());
     }
 
-    // Подключаем WebSocket только к тем монетам, что на главной (4 избранных)
     reconnectWebSocket();
     renderPortfolioValues();
 }
@@ -266,6 +392,12 @@ addClose.addEventListener("click", closeAddModal);
 addModal.addEventListener("click", (e) => { if (e.target === addModal) closeAddModal(); });
 addConfirm.addEventListener("click", addCoin);
 tickerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addCoin(); });
+
+// ★ Кнопка «+ Добавить токен» под карточками
+const addBtnBottom = document.getElementById("addBtnBottom");
+if (addBtnBottom) {
+    addBtnBottom.addEventListener("click", openAddModal);
+}
 
 // ============================================================
 //  📊 ФОРМАТИРОВАНИЕ
@@ -514,6 +646,112 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ============================================================
+//  🌐 БЛОК «ВЕСЬ КРИПТОРЫНОК»
+// ============================================================
+const MARKET_CACHE_KEY = "marketCache";
+const MARKET_TTL = 5 * 60 * 1000; // 5 минут
+
+async function loadMarketData() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(MARKET_CACHE_KEY));
+        if (cached && cached.time && (Date.now() - cached.time < MARKET_TTL)) {
+            renderMarketData(cached);
+            return;
+        }
+    } catch (e) {}
+
+    try {
+        const res1 = await fetch("https://api.coingecko.com/api/v3/global");
+        const json1 = await res1.json();
+        const g = json1.data;
+
+        const totalCap = g.total_market_cap.usd;
+        const change = g.market_cap_change_percentage_24h_usd;
+        const btcDom = g.market_cap_percentage.btc;
+        const ethDom = g.market_cap_percentage.eth;
+        const otherDom = 100 - btcDom - ethDom;
+
+        const res2 = await fetch(
+            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=30"
+        );
+        const json2 = await res2.json();
+        const prices = json2.prices.map(p => p[1]);
+
+        const data = {
+            totalCap,
+            change,
+            btcDom,
+            ethDom,
+            otherDom,
+            prices,
+            time: Date.now(),
+        };
+
+        localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify(data));
+        renderMarketData(data);
+    } catch (e) {
+        console.warn("Не удалось загрузить данные рынка:", e);
+    }
+}
+
+function renderMarketData(data) {
+    const capEl = document.getElementById("marketCap");
+    if (capEl) capEl.textContent = formatMarketCap(data.totalCap);
+
+    const changeEl = document.getElementById("marketChange");
+    if (changeEl) {
+        const sign = data.change >= 0 ? "+" : "";
+        changeEl.textContent = sign + data.change.toFixed(2) + "%";
+        changeEl.classList.toggle("down", data.change < 0);
+    }
+
+    const domBtcEl = document.getElementById("domBtc");
+    const domEthEl = document.getElementById("domEth");
+    const domOtherEl = document.getElementById("domOther");
+
+    if (domBtcEl) domBtcEl.textContent = data.btcDom.toFixed(2) + "%";
+    if (domEthEl) domEthEl.textContent = data.ethDom.toFixed(2) + "%";
+    if (domOtherEl) domOtherEl.textContent = data.otherDom.toFixed(2) + "%";
+
+    const barBtc = document.getElementById("domBarBtc");
+    const barEth = document.getElementById("domBarEth");
+    const barOther = document.getElementById("domBarOther");
+
+    if (barBtc) barBtc.style.width = data.btcDom + "%";
+    if (barEth) barEth.style.width = data.ethDom + "%";
+    if (barOther) barOther.style.width = data.otherDom + "%";
+
+    drawMarketSparkline(data.prices);
+}
+
+function formatMarketCap(value) {
+    if (value >= 1e12) return "$" + (value / 1e12).toFixed(2) + "T";
+    if (value >= 1e9) return "$" + (value / 1e9).toFixed(2) + "B";
+    if (value >= 1e6) return "$" + (value / 1e6).toFixed(2) + "M";
+    return "$" + value.toFixed(2);
+}
+
+function drawMarketSparkline(prices) {
+    const polyline = document.getElementById("marketSparkline");
+    if (!polyline || !prices || prices.length < 2) return;
+
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min || 1;
+
+    const points = prices.map((v, i) => {
+        const x = (i / (prices.length - 1)) * 100;
+        const y = 38 - ((v - min) / range) * 36;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(" ");
+
+    polyline.setAttribute("points", points);
+
+    const isUp = prices[prices.length - 1] >= prices[0];
+    polyline.classList.toggle("down", !isUp);
+}
+
+// ============================================================
 //  🔌 WEBSOCKET
 // ============================================================
 let ws = null;
@@ -562,13 +800,7 @@ function connect() {
 // ============================================================
 //  🚀 ЗАПУСК
 // ============================================================
-
-// ★ Кнопка «+ Добавить токен» под карточками
-const addBtnBottom = document.getElementById("addBtnBottom");
-if (addBtnBottom) {
-    addBtnBottom.addEventListener("click", openAddModal);
-}
-
 initTheme();
 renderWatchlist();
 loadBinanceSymbols();
+loadMarketData();

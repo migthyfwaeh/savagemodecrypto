@@ -1,8 +1,8 @@
 // ---------- Дефолтные монеты (на случай, если watchlist пустой) ----------
 const DEFAULT_COINS = [
-    { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "btc.svg" },
-    { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "sol.svg" },
-    { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zec.svg" },
+    { symbol: "btcusdt", name: "Bitcoin", ticker: "BTC", localIcon: "Bitcoin.svg" },
+    { symbol: "solusdt", name: "Solana",  ticker: "SOL", localIcon: "solana.svg" },
+    { symbol: "zecusdt", name: "Zcash",   ticker: "ZEC", localIcon: "zcash.svg" },
     { symbol: "gramusdt", name: "Gram",   ticker: "GRAM", localIcon: "gram.svg" },
 ];
 
@@ -84,7 +84,6 @@ const tickerInput = document.getElementById("tickerInput");
 const addHint = document.getElementById("addHint");
 const addConfirm = document.getElementById("addConfirm");
 const addBtn = document.getElementById("addBtn");
-const hintRow = document.getElementById("hintRow");
 
 // ---------- Состояние ----------
 const cards = {};
@@ -119,6 +118,125 @@ function initTheme() {
             renderChart(currentChartSymbol, currentChartInterval);
         }
     });
+}
+
+// ============================================================
+//  📊 РЕКОМЕНДАТЕЛЬНАЯ СИСТЕМА
+// ============================================================
+let ratingsCache = JSON.parse(localStorage.getItem("ratingsCache") || "{}");
+const RATING_TTL = 60 * 60 * 1000; // 1 час
+
+function calcRSI(closes, period = 14) {
+    if (closes.length < period + 1) return null;
+
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+        const diff = closes[i] - closes[i - 1];
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    for (let i = period + 1; i < closes.length; i++) {
+        const diff = closes[i] - closes[i - 1];
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+    }
+
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+function calcMA(closes, period) {
+    if (closes.length < period) return null;
+    const slice = closes.slice(-period);
+    const sum = slice.reduce((a, b) => a + b, 0);
+    return sum / period;
+}
+
+async function calcRating(symbol) {
+    const cached = ratingsCache[symbol];
+    if (cached && (Date.now() - cached.timestamp < RATING_TTL)) {
+        return cached;
+    }
+
+    try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1d&limit=250`;
+        const res = await fetch(url);
+        const raw = await res.json();
+
+        if (!Array.isArray(raw) || raw.length < 50) {
+            const result = { rating: "neutral", level: 0, reason: "Недостаточно данных", timestamp: Date.now() };
+            ratingsCache[symbol] = result;
+            localStorage.setItem("ratingsCache", JSON.stringify(ratingsCache));
+            return result;
+        }
+
+        const closes = raw.map(k => parseFloat(k[4]));
+        const currentPrice = closes[closes.length - 1];
+
+        const rsi = calcRSI(closes, 14);
+        const ma50 = calcMA(closes, 50);
+        const ma200 = calcMA(closes, 200);
+
+        let score = 0;
+        const signals = [];
+
+        if (rsi !== null) {
+            if (rsi < 30) { score += 1; signals.push(`RSI ${rsi.toFixed(1)} → перепродан`); }
+            else if (rsi > 70) { score -= 1; signals.push(`RSI ${rsi.toFixed(1)} → перекуплен`); }
+            else signals.push(`RSI ${rsi.toFixed(1)} → нейтрально`);
+        }
+
+        if (ma50 !== null) {
+            if (currentPrice > ma50) { score += 1; signals.push(`Цена > MA50`); }
+            else { score -= 1; signals.push(`Цена < MA50`); }
+        }
+
+        if (ma200 !== null) {
+            if (currentPrice > ma200) { score += 1; signals.push(`Цена > MA200`); }
+            else { score -= 1; signals.push(`Цена < MA200`); }
+        }
+
+        let rating, level;
+        if (score >= 3) { rating = "strong_buy"; level = 2; }
+        else if (score >= 1) { rating = "buy"; level = 1; }
+        else if (score <= -3) { rating = "strong_sell"; level = -2; }
+        else if (score <= -1) { rating = "sell"; level = -1; }
+        else { rating = "neutral"; level = 0; }
+
+        const result = { rating, level, score, signals, rsi, ma50, ma200, currentPrice, timestamp: Date.now() };
+        ratingsCache[symbol] = result;
+        localStorage.setItem("ratingsCache", JSON.stringify(ratingsCache));
+        return result;
+    } catch (e) {
+        console.warn(`Не удалось посчитать рейтинг для ${symbol}:`, e);
+        return { rating: "neutral", level: 0, reason: "Ошибка загрузки", timestamp: Date.now() };
+    }
+}
+
+// ★ Отрисовка бейджа рейтинга (текстовый формат)
+function renderRatingBadge(container, ratingData) {
+    if (!container) return;
+    const { rating } = ratingData;
+
+    let text, cls;
+    if (rating === "strong_buy") { text = "Активно покупать"; cls = "rating-strong-buy"; }
+    else if (rating === "buy") { text = "Покупать"; cls = "rating-buy"; }
+    else if (rating === "strong_sell") { text = "Активно продавать"; cls = "rating-strong-sell"; }
+    else if (rating === "sell") { text = "Продавать"; cls = "rating-sell"; }
+    else { text = "Нейтрально"; cls = "rating-neutral"; }
+
+    container.innerHTML = `
+        <span class="rating-label">Тех. анализ:</span>
+        <span class="rating-text">${text}</span>
+    `;
+    container.className = "rating-badge " + cls;
 }
 
 // ============================================================
@@ -160,6 +278,16 @@ function createCard(coin) {
     };
 
     history[coin.symbol] = history[coin.symbol] || [];
+
+    // ★ Расчёт рейтинга
+    const ratingEl = card.querySelector(".rating-badge");
+    if (ratingEl) {
+        ratingEl.dataset.symbol = coin.symbol;
+        calcRating(coin.symbol).then((data) => {
+            renderRatingBadge(ratingEl, data);
+        });
+    }
+
     return node;
 }
 
@@ -171,13 +299,6 @@ function renderWatchlist() {
         grid.innerHTML = `<p style="color:var(--text-muted);grid-column:1/-1;text-align:center;padding:40px 0;">Список пуст. Добавь токены.</p>`;
     } else {
         watchlist.forEach((coin) => grid.appendChild(createCard(coin)));
-    }
-
-    // Показываем подсказку, если монет меньше 4
-    if (watchlist.length < 4) {
-        hintRow.style.display = "block";
-    } else {
-        hintRow.style.display = "none";
     }
 
     reconnectWebSocket();
@@ -251,7 +372,9 @@ function setHint(text, cls) {
     addHint.className = "add-hint" + (cls ? " " + cls : "");
 }
 
-addBtn.addEventListener("click", openAddModal);
+if (addBtn) {
+    addBtn.addEventListener("click", openAddModal);
+}
 addClose.addEventListener("click", closeAddModal);
 addModal.addEventListener("click", (e) => { if (e.target === addModal) closeAddModal(); });
 addConfirm.addEventListener("click", addCoin);
