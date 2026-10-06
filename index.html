@@ -34,7 +34,6 @@
             </div>
         </header>
 
-        <!-- ★ Строка с заголовком «Избранное» и кнопкой «Все токены» -->
         <div class="section-header">
             <h2 class="section-title">Избранное</h2>
             <a href="all.html" class="btn btn-all">
@@ -46,7 +45,6 @@
 
         <!-- ★ Блок «Весь крипторынок» -->
         <section class="market-block" id="marketBlock">
-            <!-- Верхняя часть: TOTAL -->
             <div class="market-total">
                 <div class="market-total-head">
                     <div class="market-title">
@@ -67,7 +65,6 @@
                 <div class="market-chart-label">1 месяц</div>
             </div>
 
-            <!-- Нижняя часть: Доминация -->
             <div class="market-domination">
                 <div class="domination-title">Доминация</div>
 
@@ -110,13 +107,80 @@
             </button>
         </div>
 
+        <!-- ★ Блок «Валюты и сырьё» -->
+        <section class="forex-block">
+            <div class="section-header">
+                <h2 class="section-title">Валюты и сырьё</h2>
+            </div>
+
+            <div class="forex-grid">
+                <!-- USD/RUB -->
+                <div class="forex-card">
+                    <div class="forex-head">
+                        <div class="forex-icon">🇺🇸</div>
+                        <div>
+                            <div class="forex-name">Доллар США</div>
+                            <div class="forex-ticker">USD / RUB</div>
+                        </div>
+                    </div>
+                    <div class="forex-price" id="usdPrice">—</div>
+                    <div class="forex-label">Курс ЦБ РФ</div>
+                    <div class="forex-updated" id="usdUpdated">—</div>
+                </div>
+
+                <!-- EUR/RUB -->
+                <div class="forex-card">
+                    <div class="forex-head">
+                        <div class="forex-icon">🇪🇺</div>
+                        <div>
+                            <div class="forex-name">Евро</div>
+                            <div class="forex-ticker">EUR / RUB</div>
+                        </div>
+                    </div>
+                    <div class="forex-price" id="eurPrice">—</div>
+                    <div class="forex-label">Курс ЦБ РФ</div>
+                    <div class="forex-updated" id="eurUpdated">—</div>
+                </div>
+
+                <!-- Золото -->
+                <div class="forex-card">
+                    <div class="forex-head">
+                        <div class="forex-icon">🥇</div>
+                        <div>
+                            <div class="forex-name">Золото</div>
+                            <div class="forex-ticker">XAU / USD</div>
+                        </div>
+                    </div>
+                    <div class="forex-price" id="goldPrice">—</div>
+                    <div class="forex-change" id="goldChange">—</div>
+                    <div class="forex-label">Мировая цена</div>
+                    <div class="forex-updated" id="goldUpdated">—</div>
+                </div>
+
+                <!-- Нефть Brent -->
+                <div class="forex-card">
+                    <div class="forex-head">
+                        <div class="forex-icon">🛢️</div>
+                        <div>
+                            <div class="forex-name">Нефть Brent</div>
+                            <div class="forex-ticker">UKOIL</div>
+                        </div>
+                    </div>
+                    <div class="forex-price" id="oilPrice">—</div>
+                    <div class="forex-change" id="oilChange">—</div>
+                    <div class="forex-label">Мировая цена</div>
+                    <div class="forex-updated" id="oilUpdated">—</div>
+                </div>
+            </div>
+        </section>
+
         <footer class="footer">
             <span>Источник: Binance WebSocket</span>
             <span id="lastUpdate">—</span>
         </footer>
     </div>
 
-    <!-- ★ Модальное окно добавления токена -->
+    <!-- Модальное окно добавления токена -->
     <div class="modal" id="addModal">
         <div class="modal-content modal-small">
             <div class="modal-header">
@@ -135,13 +199,13 @@
                     autocomplete="off"
                     spellcheck="false"
                 />
-                <p class="add-hint" id="addHint">Введи тикер — проверим, есть ли пара на Binance.</p>
+                <p class="add-hint" id="addHint">Введи тикер — проверим по списку Binance.</p>
                 <button class="btn btn-primary" id="addConfirm">Добавить</button>
             </div>
         </div>
     </div>
 
-    <!-- ★ Модальное окно с графиком -->
+    <!-- Модальное окно с графиком -->
     <div class="modal" id="chartModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -163,7 +227,7 @@
         </div>
     </div>
 
-    <!-- ★ Модальное окно портфеля -->
+    <!-- Модальное окно портфеля -->
     <div class="modal" id="portfolioModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -218,7 +282,6 @@
                 </div>
             </div>
 
-            <!-- ★ Бейдж рейтинга -->
             <div class="rating-badge"></div>
 
             <div class="sparkline">
@@ -229,7 +292,6 @@
         </div>
     </template>
 
-    <!-- ★ Шаблон пустого слота -->
     <template id="emptyCardTemplate">
         <div class="card card-empty">
             <button class="card-add" title="Добавить токен">+</button>

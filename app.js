@@ -224,7 +224,6 @@ async function calcRating(symbol) {
     }
 }
 
-// ★ Отрисовка бейджа рейтинга (текстовый формат)
 function renderRatingBadge(container, ratingData) {
     if (!container) return;
     const { rating } = ratingData;
@@ -283,7 +282,6 @@ function createCard(coin) {
 
     history[coin.symbol] = history[coin.symbol] || [];
 
-    // ★ Расчёт рейтинга для карточки
     const ratingEl = card.querySelector(".rating-badge");
     if (ratingEl) {
         ratingEl.dataset.symbol = coin.symbol;
@@ -393,7 +391,6 @@ addModal.addEventListener("click", (e) => { if (e.target === addModal) closeAddM
 addConfirm.addEventListener("click", addCoin);
 tickerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addCoin(); });
 
-// ★ Кнопка «+ Добавить токен» под карточками
 const addBtnBottom = document.getElementById("addBtnBottom");
 if (addBtnBottom) {
     addBtnBottom.addEventListener("click", openAddModal);
@@ -649,7 +646,7 @@ document.addEventListener("keydown", (e) => {
 //  🌐 БЛОК «ВЕСЬ КРИПТОРЫНОК»
 // ============================================================
 const MARKET_CACHE_KEY = "marketCache";
-const MARKET_TTL = 5 * 60 * 1000; // 5 минут
+const MARKET_TTL = 5 * 60 * 1000;
 
 async function loadMarketData() {
     try {
@@ -677,16 +674,7 @@ async function loadMarketData() {
         const json2 = await res2.json();
         const prices = json2.prices.map(p => p[1]);
 
-        const data = {
-            totalCap,
-            change,
-            btcDom,
-            ethDom,
-            otherDom,
-            prices,
-            time: Date.now(),
-        };
-
+        const data = { totalCap, change, btcDom, ethDom, otherDom, prices, time: Date.now() };
         localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify(data));
         renderMarketData(data);
     } catch (e) {
@@ -752,6 +740,170 @@ function drawMarketSparkline(prices) {
 }
 
 // ============================================================
+//  💱 БЛОК «ВАЛЮТЫ И СЫРЬЁ»
+// ============================================================
+
+// Загрузка USD/RUB и EUR/RUB с fawazahmed0/exchange-api (без ключа, без лимитов)
+async function loadForexData() {
+    const urls = [
+        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
+        "https://latest.currency-api.pages.dev/v1/currencies/usd.json",
+    ];
+
+    let data = null;
+
+    for (const url of urls) {
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                data = await res.json();
+                break;
+            }
+        } catch (e) {
+            console.warn(`Не удалось загрузить с ${url}, пробуем следующий…`);
+        }
+    }
+
+    if (!data) {
+        console.warn("Не удалось загрузить курсы валют ни с одного источника");
+        return;
+    }
+
+    const usdRub = data.usd.rub;
+    const usdEur = data.usd.eur;
+    const eurRub = usdRub / usdEur;
+
+    // USD/RUB
+    const usdPriceEl = document.getElementById("usdPrice");
+    const usdUpdatedEl = document.getElementById("usdUpdated");
+
+    if (usdPriceEl) usdPriceEl.textContent = usdRub.toFixed(2) + " ₽";
+    if (usdUpdatedEl && data.date) {
+        const d = new Date(data.date);
+        usdUpdatedEl.textContent = "Обновлено: " + d.toLocaleDateString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+        });
+    }
+
+    // EUR/RUB
+    const eurPriceEl = document.getElementById("eurPrice");
+    const eurUpdatedEl = document.getElementById("eurUpdated");
+
+    if (eurPriceEl) eurPriceEl.textContent = eurRub.toFixed(2) + " ₽";
+    if (eurUpdatedEl && data.date) {
+        const d = new Date(data.date);
+        eurUpdatedEl.textContent = "Обновлено: " + d.toLocaleDateString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+        });
+    }
+}
+
+// 🥇 Золото — XAUS Gold API (без лимитов, без ключей)
+async function loadGoldData() {
+    try {
+        const res = await fetch("https://xaus.com/api/v1/spot");
+        const data = await res.json();
+
+        const price = data.spot_usd_oz || data.price;
+        if (!price) throw new Error("Нет цены");
+
+        const priceEl = document.getElementById("goldPrice");
+        if (priceEl) {
+            priceEl.textContent = "$" + price.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        const changeEl = document.getElementById("goldChange");
+        if (changeEl && data.previous_close) {
+            const diff = price - data.previous_close;
+            const pct = (diff / data.previous_close) * 100;
+            const sign = pct >= 0 ? "+" : "";
+            changeEl.textContent = sign + pct.toFixed(2) + "%";
+            changeEl.classList.toggle("up", pct > 0);
+            changeEl.classList.toggle("down", pct < 0);
+        } else if (changeEl) {
+            changeEl.textContent = "—";
+        }
+
+        const updatedEl = document.getElementById("goldUpdated");
+        if (updatedEl && data.data_state && data.data_state.as_of) {
+            const d = new Date(data.data_state.as_of);
+            updatedEl.textContent = "Обновлено: " + d.toLocaleTimeString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } else if (updatedEl && data.as_of) {
+            const d = new Date(data.as_of);
+            updatedEl.textContent = "Обновлено: " + d.toLocaleTimeString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+    } catch (e) {
+        console.warn("Не удалось загрузить цену золота:", e);
+    }
+}
+
+// 🛢️ Нефть — straits.live CSV (данные каждые 5 минут)
+async function loadOilData() {
+    try {
+        const res = await fetch("https://straits.live/data/oil.csv");
+        const text = await res.text();
+
+        const lines = text.trim().split("\n");
+        if (lines.length < 2) throw new Error("Пустой CSV");
+
+        const headers = lines[0].split(",");
+        const brentIdx = headers.indexOf("brent_usd");
+        const timestampIdx = headers.indexOf("timestamp_iso");
+        if (brentIdx === -1) throw new Error("Нет колонки brent_usd");
+
+        const lastLine = lines[lines.length - 1].split(",");
+        const brent = parseFloat(lastLine[brentIdx]);
+        if (isNaN(brent)) throw new Error("Нет цены Brent");
+
+        const priceEl = document.getElementById("oilPrice");
+        if (priceEl) {
+            priceEl.textContent = "$" + brent.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        const changeEl = document.getElementById("oilChange");
+        if (changeEl && lines.length >= 3) {
+            const prevLine = lines[lines.length - 2].split(",");
+            const prevBrent = parseFloat(prevLine[brentIdx]);
+            if (!isNaN(prevBrent)) {
+                const diff = brent - prevBrent;
+                const pct = (diff / prevBrent) * 100;
+                const sign = pct >= 0 ? "+" : "";
+                changeEl.textContent = sign + pct.toFixed(2) + "%";
+                changeEl.classList.toggle("up", pct > 0);
+                changeEl.classList.toggle("down", pct < 0);
+            }
+        }
+
+        const updatedEl = document.getElementById("oilUpdated");
+        if (updatedEl && timestampIdx !== -1 && lastLine[timestampIdx]) {
+            const d = new Date(lastLine[timestampIdx]);
+            updatedEl.textContent = "Обновлено: " + d.toLocaleString("ru-RU", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+    } catch (e) {
+        console.warn("Не удалось загрузить цену нефти:", e);
+    }
+}
+
+// ============================================================
 //  🔌 WEBSOCKET
 // ============================================================
 let ws = null;
@@ -804,3 +956,6 @@ initTheme();
 renderWatchlist();
 loadBinanceSymbols();
 loadMarketData();
+loadForexData();
+loadGoldData();
+loadOilData();

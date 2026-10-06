@@ -1024,7 +1024,110 @@ body.light .card:hover { border-color: #cbd5e1; }
 .domination-bar-eth { background: #10b981; }
 .domination-bar-other { background: #ef4444; }
 
+
+/* ============================================================
+   ★ Блок «Валюты и сырьё»
+   ============================================================ */
+.forex-block {
+    margin-top: 32px;
+}
+
+.forex-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+}
+
+.forex-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px;
+    transition: transform 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.forex-card:hover {
+    background: var(--card-hover);
+    border-color: #2d3748;
+    transform: translateY(-2px);
+}
+
+body.light .forex-card:hover { border-color: #cbd5e1; }
+
+.forex-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.forex-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: rgba(128, 128, 128, 0.1);
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.forex-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+}
+
+.forex-ticker {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    letter-spacing: 0.05em;
+}
+
+.forex-price {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.forex-change {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.forex-change.up { color: var(--green); }
+.forex-change.down { color: var(--red); }
+
+.forex-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.forex-widget {
+    min-height: 100px;
+}
+
+.forex-widget iframe,
+.forex-widget > div {
+    width: 100% !important;
+}
+
 /* ---------- Мобильная адаптация ---------- */
+@media (max-width: 900px) {
+    .forex-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 600px) {
     .market-block {
         padding: 20px;
@@ -1046,4 +1149,19 @@ body.light .card:hover { border-color: #cbd5e1; }
     .domination-value {
         font-size: 16px;
     }
+
+    .forex-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* ---------- Подпись «Обновлено» под карточками валют/сырья ---------- */
+.forex-updated {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: "JetBrains Mono", monospace;
 }
